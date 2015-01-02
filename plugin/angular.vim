@@ -100,10 +100,14 @@ endfunction
 " Helper
 " jacked from abolish.vim (was s:snakecase there). thank you, tim pope.
 function! s:dashcase(word) abort
+  return substitute(s:snakecase(a:word),'_','-','g')
+endfunction
+
+function! s:snakecase(word) abort
   let word = substitute(a:word,'::','/','g')
   let word = substitute(word,'\(\u\+\)\(\u\l\)','\1_\2','g')
   let word = substitute(word,'\(\l\|\d\)\(\u\)','\1_\2','g')
-  let word = substitute(word,'_','-','g')
+  let word = substitute(word,'[.-]','_','g')
   let word = tolower(word)
   return word
 endfunction
@@ -127,12 +131,15 @@ function! s:FindFileBasedOnAngularServiceUnderCursor(cmd) abort
   endif
 
   let l:wordundercursor = expand('<cword>')
-  let l:dashcased = s:dashcase(l:wordundercursor)
-  let l:filethatmayexist = l:dashcased . '.js'
 
-  if exists('g:angular_filename_convention') && (g:angular_filename_convention == 'camelcased' || g:angular_filename_convention == 'titlecased')
+  if exists('g:angular_filename_convention') && (index(['camelcased', 'titlecased'], g:angular_filename_convention) >= 0)
     call <SID>Find(l:wordundercursor . '.js', a:cmd)
   else
+    let l:coerced_word = s:dashcase(l:wordundercursor)
+    if exists('g:angular_filename_convention') && (g:angular_filename_convention == 'snakecased')
+      let l:coerced_word = s:snakecase(l:wordundercursor)
+    endif
+    let l:filethatmayexist = l:coerced_word . '.js'
     call <SID>Find(l:filethatmayexist, a:cmd)
   endif
 endfunction
