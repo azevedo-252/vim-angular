@@ -214,37 +214,63 @@ function! s:SearchUpForPattern(pattern) abort
   execute 'silent normal! ' . '$?' . a:pattern . "\r"
 endfunction
 
+function! s:RevertOtherSingleSpecKeywords() abort
+  " if there was a spec (anywhere in the file) highlighted with a single spec
+  " keyword, revert it
+  let l:positionofspectorun = getpos('.')
+
+  " this can move the cursor, hence setting the cursor back
+  if exists('g:angular_testing_framework') && g:angular_testing_framework == 'mocha'
+    %s/\(describe\|it\)\.only/\1/ge
+  else
+    %s/ddescribe/describe/ge
+    %s/iit/it/ge
+  endif
+
+  " move cursor back to the spec we want to run
+  call setpos('.', l:positionofspectorun)
+endfunction
+
+function! s:ApplySingleSpecKeyword(speckeyword) abort
+  if exists('g:angular_testing_framework') && g:angular_testing_framework == 'mocha'
+    " append ".only" to "it" or "describe"
+    let l:singlespeckeyword = a:speckeyword . '.only'
+  else
+    " either change the current spec to "iit" or the current block to "ddescribe"
+    let l:firstletter = s:FirstLetterOf(a:speckeyword)
+    let l:singlespeckeyword = l:firstletter . a:speckeyword
+  endif
+
+  execute 'silent normal! cw' . l:singlespeckeyword
+endfunction
+
+function! s:RevertSingleSpecKeyword() abort
+  if exists('g:angular_testing_framework') && g:angular_testing_framework == 'mocha'
+    " delete the ".only" part
+    execute 'silent normal! f.5x'
+  else
+    " either delete the second i in "iit" or the second d in "ddescribe"
+    execute 'silent normal! x'
+  endif
+endfunction
+
 function! s:FirstLetterOf(sourcestring) abort
   return strpart(a:sourcestring, 0, 1)
 endfunction
 
-function! s:AngularRunSpecOrBlock(jasminekeyword) abort
+function! s:AngularRunSpecOrBlock(speckeyword) abort
   " save cursor position so we can go back
   let b:angular_pos = getpos('.')
 
-  cal s:SearchUpForPattern(a:jasminekeyword . '(')
+  cal s:SearchUpForPattern('\v' . a:speckeyword . '(.only|)\(')
 
   let l:wordundercursor = expand('<cword>')
-  let l:firstletter = s:FirstLetterOf(a:jasminekeyword)
 
-  if l:wordundercursor == a:jasminekeyword
-    " if there was a spec (anywhere in the file) highlighted with "iit" before, revert it to "it"
-    let l:positionofspectorun = getpos('.')
-
-    " this can move the cursor, hence setting the cursor back
-    %s/ddescribe/describe/ge
-    %s/iit/it/ge
-
-    " move cursor back to the spec we want to run
-    call setpos('.', l:positionofspectorun)
-
-    " either change the current spec to "iit" or
-    " the current block to "ddescribe"
-    execute 'silent normal! cw' . l:firstletter . a:jasminekeyword
-  elseif l:wordundercursor == l:firstletter . a:jasminekeyword
-    " either delete the second i in "iit" or
-    " the second d in "ddescribe"
-    execute 'silent normal! x'
+  if l:wordundercursor == a:speckeyword && getline('.') !~ '\.only'
+    call s:RevertOtherSingleSpecKeywords()
+    call s:ApplySingleSpecKeyword(a:speckeyword)
+  else
+    call s:RevertSingleSpecKeyword()
   endif
 
   update " write the file if modified
